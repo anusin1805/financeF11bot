@@ -284,244 +284,41 @@
     </div>
 
     <script>
-        // Sample stock data (simulating data from Google Sheets)
-        const stockData = {
-            'AAPL': {
-                name: 'Apple Inc.',
-                exchange: 'NASDAQ',
-                country: 'USA',
-                category: 'Technology',
-                open: 178.50,
-                close: 182.25,
-                high: 183.00,
-                low: 177.80,
-                change: 3.75,
-                percentChange: 2.10,
-                marketCap: '2.85T',
-                beta: 1.25,
-                volatility: 0.28,
-                rsi: 62.4
-            },
-            'GOOGL': {
-                name: 'Alphabet Inc.',
-                exchange: 'NASDAQ',
-                country: 'USA',
-                category: 'Technology',
-                open: 142.30,
-                close: 145.80,
-                high: 146.20,
-                low: 141.90,
-                change: 3.50,
-                percentChange: 2.46,
-                marketCap: '1.84T',
-                beta: 1.05,
-                volatility: 0.24,
-                rsi: 58.7
-            },
-            'MSFT': {
-                name: 'Microsoft Corporation',
-                exchange: 'NASDAQ',
-                country: 'USA',
-                category: 'Technology',
-                open: 420.15,
-                close: 425.60,
-                high: 427.30,
-                low: 419.50,
-                change: 5.45,
-                percentChange: 1.30,
-                marketCap: '3.16T',
-                beta: 0.95,
-                volatility: 0.22,
-                rsi: 65.2
-            },
-            'TSLA': {
-                name: 'Tesla Inc.',
-                exchange: 'NASDAQ',
-                country: 'USA',
-                category: 'Automotive',
-                open: 248.30,
-                close: 242.50,
-                high: 251.20,
-                low: 241.80,
-                change: -5.80,
-                percentChange: -2.34,
-                marketCap: '770.2B',
-                beta: 2.15,
-                volatility: 0.58,
-                rsi: 44.8
-            },
-            'AMZN': {
-                name: 'Amazon.com Inc.',
-                exchange: 'NASDAQ',
-                country: 'USA',
-                category: 'E-commerce',
-                open: 178.90,
-                close: 182.45,
-                high: 183.60,
-                low: 177.20,
-                change: 3.55,
-                percentChange: 1.98,
-                marketCap: '1.88T',
-                beta: 1.18,
-                volatility: 0.30,
-                rsi: 61.3
-            }
-        };
+        // Replace the fake stockData with this fetch function
+async function getLiveSheetData() {
+    // This is the "Export as CSV" link for your specific sheet
+    const sheetId = '1YGNIxeDVD0FyO0shvhL_AQ0gcM9qaXEoN8lyyXWaf_s';
+    const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
-        const chatMessages = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
+    const response = await fetch(url);
+    const text = await response.text();
+    
+    // Google returns some extra text at the start, we need to trim it
+    const json = JSON.parse(text.substring(47, text.length - 2));
+    const rows = json.table.rows;
 
-        function addMessage(content, isUser = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.innerHTML = content;
-            
-            messageDiv.appendChild(contentDiv);
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Convert rows into a searchable object
+    const liveData = {};
+    rows.forEach(row => {
+        const ticker = row.c[3]?.v; // Column D (Index 3)
+        if (ticker) {
+            liveData[ticker.toUpperCase()] = {
+                name: row.c[2]?.v || "Unknown",    // Column C
+                close: row.c[8]?.v || 0,           // Column I
+                marketCap: row.c[12]?.v || "N/A",  // Column M
+                // Add more columns as needed based on your sheet layout
+            };
         }
+    });
+    return liveData;
+}
 
-        function showTypingIndicator() {
-            const typingDiv = document.createElement('div');
-            typingDiv.className = 'message bot';
-            typingDiv.id = 'typingIndicator';
-            
-            const indicatorDiv = document.createElement('div');
-            indicatorDiv.className = 'typing-indicator active';
-            indicatorDiv.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
-            
-            typingDiv.appendChild(indicatorDiv);
-            chatMessages.appendChild(typingDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function removeTypingIndicator() {
-            const indicator = document.getElementById('typingIndicator');
-            if (indicator) {
-                indicator.remove();
-            }
-        }
-
-        function extractTicker(message) {
-            const upperMessage = message.toUpperCase();
-            const words = upperMessage.split(/\s+/);
-            
-            for (let word of words) {
-                const cleaned = word.replace(/[^A-Z]/g, '');
-                if (cleaned.length >= 1 && cleaned.length <= 5 && stockData[cleaned]) {
-                    return cleaned;
-                }
-            }
-            
-            for (let ticker in stockData) {
-                if (upperMessage.includes(ticker)) {
-                    return ticker;
-                }
-            }
-            
-            return null;
-        }
-
-        function formatStockCard(ticker, data) {
-            const changeClass = data.change >= 0 ? 'positive' : 'negative';
-            const changeSymbol = data.change >= 0 ? '+' : '';
-            
-            return `
-                <div class="stock-card">
-                    <h3>${ticker} - ${data.name}</h3>
-                    <div class="stock-info">
-                        <div class="stock-info-item">
-                            <span class="label">Exchange:</span>
-                            <span class="value">${data.exchange}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Category:</span>
-                            <span class="value">${data.category}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Open:</span>
-                            <span class="value">$${data.open.toFixed(2)}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Close:</span>
-                            <span class="value">$${data.close.toFixed(2)}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">High:</span>
-                            <span class="value">$${data.high.toFixed(2)}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Low:</span>
-                            <span class="value">$${data.low.toFixed(2)}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Change:</span>
-                            <span class="value ${changeClass}">${changeSymbol}$${data.change.toFixed(2)} (${changeSymbol}${data.percentChange.toFixed(2)}%)</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Market Cap:</span>
-                            <span class="value">$${data.marketCap}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Beta:</span>
-                            <span class="value">${data.beta}</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">Volatility:</span>
-                            <span class="value">${(data.volatility * 100).toFixed(1)}%</span>
-                        </div>
-                        <div class="stock-info-item">
-                            <span class="label">RSI:</span>
-                            <span class="value">${data.rsi.toFixed(1)}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function handleMessage() {
-            const message = messageInput.value.trim();
-            if (!message) return;
-
-            addMessage(message, true);
-            messageInput.value = '';
-
-            showTypingIndicator();
-
-            setTimeout(() => {
-                removeTypingIndicator();
-
-                const ticker = extractTicker(message);
-                
-                if (ticker && stockData[ticker]) {
-                    const stockInfo = stockData[ticker];
-                    const response = `Here's the information for ${ticker}:${formatStockCard(ticker, stockInfo)}`;
-                    addMessage(response);
-                } else {
-                    const response = `I couldn't find information for that ticker. Available tickers: ${Object.keys(stockData).join(', ')}. Please try one of these or check your spelling.`;
-                    addMessage(response);
-                }
-            }, 800);
-        }
-
-        function quickLookup(ticker) {
-            messageInput.value = ticker;
-            handleMessage();
-        }
-
-        sendBtn.addEventListener('click', handleMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleMessage();
-            }
-        });
-
-        // Make quickLookup available globally
-        window.quickLookup = quickLookup;
+// Call this function when the page loads
+let stockData = {};
+getLiveSheetData().then(data => {
+    stockData = data;
+    console.log("Live Data Loaded!", stockData);
+});
     </script>
 </body>
 </html>
