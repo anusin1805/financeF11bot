@@ -70,7 +70,7 @@
         // 1. Fetch live data from your specific Google Sheet
         async function getLiveSheetData() {
             const sheetId = '1YGNIxeDVD0FyO0shvhL_AQ0gcM9qaXEoN8lyyXWaf_s';
-            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=Sheet1&range=A1:P13000`;
 
             try {
                 const response = await fetch(url);
