@@ -143,6 +143,14 @@
 
         sendBtn.addEventListener('click', handleMessage);
         messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleMessage(); });
+
+        rows.forEach((row, index) => {
+    // This logs the first 5 rows to your browser console (F12)
+    if(index < 5) console.log("Row Data:", row.c); 
+
+    const ticker = row.c[3]?.v; // Index 3 = Column D
+    // ... rest of code
+});
     </script>
 </body>
 </html>
