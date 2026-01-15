@@ -70,7 +70,7 @@
         async function getLiveSheetData() {
             // 1. We request range A1:P20000 to ensure we get ALL rows
             const sheetId = '1YGNIxeDVD0FyO0shvhL_AQ0gcM9qaXEoN8lyyXWaf_s';
-            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&range=A1:P20000`;
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&range=A1:P20000&sheet=All US Tickers&range=A1:P20000`;
 
             try {
                 const response = await fetch(url);
