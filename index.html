@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Ticker Chat Assistant</title>
+    <title>Stock Ticker Assistant</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -37,7 +37,6 @@
         .chat-input-wrapper { display: flex; gap: 10px; }
         #messageInput { flex: 1; padding: 12px; border: 2px solid #e0e0e0; border-radius: 25px; outline: none; }
         #sendBtn { padding: 12px 25px; background: #667eea; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; }
-        .ticker-chip { display: inline-block; padding: 5px 12px; background: #eee; border-radius: 15px; margin: 4px; cursor: pointer; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -49,110 +48,119 @@
         <div class="chat-messages" id="chatMessages">
             <div class="message bot">
                 <div class="message-content">
-                    Hello! I'm loading live data... Please wait a moment.
+                    Hello! I'm connecting to your Google Sheet...
                 </div>
             </div>
         </div>
         <div class="chat-input-container">
             <div class="chat-input-wrapper">
-                <input type="text" id="messageInput" placeholder="Type a ticker (e.g., TSLA, AAPL)..." />
+                <input type="text" id="messageInput" placeholder="Type a ticker (e.g., AAPL)..." />
                 <button id="sendBtn">Send</button>
             </div>
         </div>
     </div>
-<script>
-    let stockData = {};
-    const chatMessages = document.getElementById('chatMessages');
-    const messageInput = document.getElementById('messageInput');
-    const sendBtn = document.getElementById('sendBtn');
 
-    async function getLiveSheetData() {
-        // Range A1:P13000 ensures we grab all 12,580+ rows
-        const sheetId = '1YGNIxeDVD0FyO0shvhL_AQ0gcM9qaXEoN8lyyXWaf_s';
-        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&range=A1:P13000`;
+    <script>
+        let stockData = {};
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
 
-        try {
-            const response = await fetch(url);
-            const text = await response.text();
-            
-            // This trims the Google-specific header and footer from the JSON
-            const json = JSON.parse(text.substring(47, text.length - 2));
-            const rows = json.table.rows; // <--- 'rows' is defined here!
+        // --- MAIN DATA FETCHING FUNCTION ---
+        async function getLiveSheetData() {
+            // 1. We request range A1:P20000 to ensure we get ALL rows
+            const sheetId = '1YGNIxeDVD0FyO0shvhL_AQ0gcM9qaXEoN8lyyXWaf_s';
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&range=A1:P20000`;
 
-            const liveData = {};
-            
-            rows.forEach((row, index) => {
-                // DEBUG: Look at your F12 console to see the first 5 rows
-                if(index < 5) console.log(`Row ${index} Debug:`, row.c);
+            try {
+                const response = await fetch(url);
+                const text = await response.text();
+                
+                // 2. Clean up Google's response text to get valid JSON
+                const json = JSON.parse(text.substring(47, text.length - 2));
+                const rows = json.table.rows; // 'rows' is defined INSIDE here
 
-                const tickerObj = row.c[3]; // Column D
-                const priceObj = row.c[8];  // Column I
-                const nameObj = row.c[2];   // Column C
+                const liveData = {};
+                
+                // 3. Loop through rows and map the columns
+                rows.forEach((row, index) => {
+                    // Check if Column D (Index 3) has a value
+                    const tickerCell = row.c[3]; 
+                    
+                    if (tickerCell && tickerCell.v) {
+                        const ticker = tickerCell.v.toString().toUpperCase().trim();
+                        
+                        // Map the rest of your columns:
+                        // Column C = Index 2 (Name)
+                        // Column I = Index 8 (Close Price)
+                        // Column M = Index 12 (Market Cap)
+                        // Column B = Index 1 (Exchange)
+                        
+                        liveData[ticker] = {
+                            name: row.c[2] ? row.c[2].v : "Unknown Name",
+                            close: row.c[8] ? row.c[8].v : "0.00",
+                            marketCap: row.c[12] ? row.c[12].v : "N/A",
+                            exchange: row.c[1] ? row.c[1].v : "N/A"
+                        };
+                    }
+                });
 
-                if (tickerObj && tickerObj.v) {
-                    const ticker = tickerObj.v.toString().toUpperCase().trim();
-                    liveData[ticker] = {
-                        name: nameObj ? nameObj.v : "Unknown",
-                        close: priceObj ? priceObj.v : "0.00",
-                        marketCap: row.c[12] ? row.c[12].v : "N/A",
-                        exchange: row.c[1] ? row.c[1].v : "N/A"
-                    };
-                }
-            });
+                console.log("Success! Loaded " + Object.keys(liveData).length + " stocks.");
+                return liveData;
 
-            console.log("Success! Total rows processed:", Object.keys(liveData).length);
-            return liveData;
-
-        } catch (err) {
-            console.error("Critical Error loading Sheet:", err);
-            return null;
+            } catch (err) {
+                console.error("Error loading data:", err);
+                addMessage("❌ Error: Could not load data. Check console for details.");
+                return null;
+            }
         }
-    }
 
-    // Initialize the bot
-    getLiveSheetData().then(data => {
-        if (data && Object.keys(data).length > 0) {
-            stockData = data;
-            addMessage("✅ Live data loaded! I am monitoring <b>" + Object.keys(data).length + "</b> tickers.");
-        } else {
-            addMessage("❌ Failed to load data. Please ensure your Google Sheet is shared as 'Anyone with the link can view'.");
+        // --- STARTUP LOGIC ---
+        getLiveSheetData().then(data => {
+            if (data) {
+                stockData = data;
+                const count = Object.keys(data).length;
+                addMessage(`✅ Live data loaded! I am currently tracking <b>${count}</b> stocks from your sheet.`);
+                addMessage(`Try searching for a ticker (e.g., <b>${Object.keys(data)[0]}</b>)`);
+            }
+        });
+
+        // --- CHAT INTERFACE LOGIC ---
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
         }
-    });
 
-    function addMessage(content, isUser = false) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-        messageDiv.innerHTML = `<div class="message-content">${content}</div>`;
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
+        function handleMessage() {
+            const query = messageInput.value.trim().toUpperCase();
+            if (!query) return;
 
-    function handleMessage() {
-        const query = messageInput.value.trim().toUpperCase();
-        if (!query) return;
+            addMessage(query, true);
+            messageInput.value = '';
 
-        addMessage(query, true);
-        messageInput.value = '';
-
-        if (stockData[query]) {
-            const data = stockData[query];
-            const card = `
-                <div class="stock-card">
-                    <h3>${query} - ${data.name}</h3>
-                    <div class="stock-info">
-                        <div><span class="label">Last Close:</span> $${data.close}</div>
-                        <div><span class="label">Exchange:</span> ${data.exchange}</div>
-                        <div><span class="label">Market Cap:</span> ${data.marketCap}</div>
-                    </div>
-                </div>`;
-            addMessage(`Data for ${query}: ${card}`);
-        } else {
-            addMessage(`Sorry, I couldn't find <b>${query}</b> in my database.`);
+            // Check if we have data for this ticker
+            if (stockData[query]) {
+                const data = stockData[query];
+                const card = `
+                    <div class="stock-card">
+                        <h3>${query} - ${data.name}</h3>
+                        <div class="stock-info">
+                            <div><span class="label">Price:</span> $${data.close}</div>
+                            <div><span class="label">Exchange:</span> ${data.exchange}</div>
+                            <div><span class="label">Market Cap:</span> ${data.marketCap}</div>
+                        </div>
+                    </div>`;
+                addMessage(`Found it! Here is the data for ${query}: ${card}`);
+            } else {
+                addMessage(`Sorry, I couldn't find <b>${query}</b> in Column D. Make sure the ticker is spelled correctly.`);
+            }
         }
-    }
 
-    sendBtn.addEventListener('click', handleMessage);
-    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleMessage(); });
-</script>
+        sendBtn.addEventListener('click', handleMessage);
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleMessage(); });
+    </script>
 </body>
 </html>
